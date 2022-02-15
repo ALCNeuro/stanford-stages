@@ -4,9 +4,18 @@ from pathlib import Path
 from pyedflib import EdfReader
 
 logging_level_STAGES = 60
-logging.addLevelName(logging_level_STAGES, 'STAGES')
+logging_level_PROGRESS = 65
+logging.addLevelName(logging_level_PROGRESS, 'PROGRESS')
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+class StanfordStagesError(Exception):
+    def __init__(self, message, edf_filename=''):
+        self.message = message
+        if isinstance(edf_filename, Path):
+            edf_filename = str(edf_filename)
+        self.edf_filename = edf_filename
 
 
 def print_log(msg: str, log_level: str = 'info'):
@@ -15,6 +24,8 @@ def print_log(msg: str, log_level: str = 'info'):
         getattr(logger, log_level)(msg)
     elif log_level.lower() == 'stages':
         logger.log(logging_level_STAGES, msg)
+    elif log_level.lower() == 'progress':
+        logger.log(logging_level_PROGRESS, msg)
 
 
 def get_edf_filenames(path2check):

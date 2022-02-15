@@ -18,14 +18,14 @@ import numpy as np
 import pyedflib
 import scipy.io as sio  # for noise level
 import scipy.signal as signal  # for edf channel sampling and filtering
-import skimage
+
 import tensorflow as tf
 from pandas import read_csv
 from scipy.fftpack import fft, ifft, fftshift
 from inf_config import ACConfig
 from inf_narco_features import HypnodensityFeatures
 from inf_network import SCModel
-from inf_tools import myprint, softmax, rolling_window_nodelay
+from inf_tools import myprint, softmax, rolling_window_nodelay, StanfordStagesError
 from pkg_resources import resource_filename
 
 
@@ -159,7 +159,7 @@ class Hypnodensity(object):
                 self._hypnodensity_features[model] = _features[model]
                 _features = _features[model]
             else:
-                print('import_features requires model and idx both be included or both be excluded.  One of the two was given and so nothing was imported :(')
+                print('import_features requires model name, when provided as an argument, to exist as a key in the imported file.  A model name was provided but not found in the import file; so nothing imported :(')
         return _features
 
     def export_hypnodensity(self, p=None):
@@ -210,11 +210,13 @@ class Hypnodensity(object):
                 print(f"Pickle encode data to: {p}")
                 with p.open('wb') as fp:
                     pickle.dump(self.encoded_data, fp)
+                    pickle.dump(self.channels_used, fp)
                 print(f"Encode data pickled to: {p}\n")
             else:
-                print("Not in a pickle!")
+                # print("Not in a pickle!")
                 with h5py.File(p, 'w') as fp:
                     fp['encodedD'] = self.encoded_data
+                    fp['channels_used'] = np.array(list(self.channels_used.keys()), dtype='S')
                 self.myprint(".h5 exporting done")
             return True
         else:
@@ -369,7 +371,6 @@ class Hypnodensity(object):
         # there is more than 5 minutes of flat line data and also when the lights are on.
         hypnogram[np.isnan(hypno[:, 0])] = 7
         return hypnogram
-
 
     def encoding(self):
 
@@ -780,6 +781,9 @@ class Hypnodensity(object):
             # config.gpu_options.per_process_gpu_memory_fraction = 1.0
             with tf.compat.v1.Session(config=config) as session:
                 ckpt = tf.compat.v1.train.get_checkpoint_state(ac_config.hypnodensity_model_dir)
+
+                if ckpt is None:
+                    raise StanfordStagesError(f"Hypnodensity model directory is empty or does not exist ('{ac_config.hypnodensity_model_dir}')")
 
                 s.restore(session, ckpt.model_checkpoint_path)
 
